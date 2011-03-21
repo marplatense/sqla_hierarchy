@@ -3,14 +3,19 @@
 from exceptions import NotImplementedError
 from nose.tools import *
 
-from sqlalchemy import Table, Column, ForeignKey, MetaData
+from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
 from sqlalchemy import Integer, Unicode, Boolean
 from sqlalchemy import select, and_
-from sqlalchemy.orm import mapper, relationship
-from smd.model import DBSession, metadata
+from sqlalchemy.orm import mapper, relationship, scoped_session, sessionmaker
 from sqla_hierarchy import hierarchy as hie
 
-from smd import test
+DBSession = scoped_session(sessionmaker())
+metadata = MetaData()
+engine = create_engine('postgresql://user:pass@localhost/db')
+DBSession.configure(bind=engine)
+metadata.bind = engine
+metadata.drop_all(engine)
+metadata.create_all(engine)
 
 dummy_tb = Table('dummy_hierarchy', metadata,
                  Column('id', Integer, primary_key=True),
@@ -119,12 +124,12 @@ class TestHierarchy(object):
         """Hierarchy: fetching the extra 'level' column"""
         qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
-        nose.tools.ok_(hasattr(rs[0], 'level') == True, 
-                       "Fetched row has not got the 'level' extra column")
+        ok_(hasattr(rs[0], 'level') == True, 
+            "Fetched row has not got the 'level' extra column")
         # let's check if the level is right
         for ev in rs:
-            nose.tools.ok_(ev.level==dummy_values[ev.id][0],
-                           "Wrong level for 'item %d'. Expected %d, got %d" %\
+            ok_(ev.level==dummy_values[ev.id][0], 
+                "Wrong level for 'item %d'. Expected %d, got %d" %\
                            (ev.id, dummy_values[ev.id][0], ev.level))
 
     def test5_is_leaf(self):
@@ -132,17 +137,17 @@ class TestHierarchy(object):
         it"""
         qry = hie.Hierarchy(dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
-        nose.tools.ok_(hasattr(rs[0], 'is_leaf') == True, 
-                       "Fetched row has not got the 'is_leaf' extra column")
+        ok_(hasattr(rs[0], 'is_leaf') == True, 
+            "Fetched row has not got the 'is_leaf' extra column")
         # according to our tree, only 5, 7, 10, 11, 12 are leaves
         for every in rs:
             if every.id in (5,7,10,11,12):
-                nose.tools.ok_(every.is_leaf == True, 
-                               'is_leaf failed. Expected True for %d' \
+                ok_(every.is_leaf == True, 
+                    'is_leaf failed. Expected True for %d' \
                                %(every.id))
             else:
-                nose.tools.ok_(every.is_leaf == False, 
-                               'is_leaf failed. Expected False for %d' \
+                ok_(every.is_leaf == False, 
+                    'is_leaf failed. Expected False for %d' \
                                %(every.id))
 
     def test6_connect_path(self):
@@ -150,101 +155,82 @@ class TestHierarchy(object):
         path using the sep character defined by the user"""
         qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
-        nose.tools.ok_(hasattr(rs[0], 'connect_path') == True, 
-                       "Fetched row has not got the 'connect_path' extra column")
+        ok_(hasattr(rs[0], 'connect_path') == True, 
+            "Fetched row has not got the 'connect_path' extra column")
         # let's check the paths
         for ev in rs:
             if ev.id == 1:
-                nose.tools.ok_(ev.connect_path==[1], 'Failed path with id 1')
+                ok_(ev.connect_path==[1], 'Failed path with id 1')
             elif ev.id == 2:
-                nose.tools.ok_(ev.connect_path==[1,2], 
-                               'Failed path with id 2')
+                ok_(ev.connect_path==[1,2], 'Failed path with id 2')
             elif ev.id == 3:
-                nose.tools.ok_(ev.connect_path==[1,3], 
-                               'Failed path with id 3')
+                ok_(ev.connect_path==[1,3], 'Failed path with id 3')
             elif ev.id == 4:
-                nose.tools.ok_(ev.connect_path==[1,2,4], 
-                               'Failed path with id 4')
+                ok_(ev.connect_path==[1,2,4], 'Failed path with id 4')
             elif ev.id == 5:
-                nose.tools.ok_(ev.connect_path==[1,3,5], 
-                               'Failed path with id 5')
+                ok_(ev.connect_path==[1,3,5], 'Failed path with id 5')
             elif ev.id == 6:
-                nose.tools.ok_(ev.connect_path==[1,2,4,6], 
-                               'Failed path with id 6')
+                ok_(ev.connect_path==[1,2,4,6], 'Failed path with id 6')
             elif ev.id == 7:
-                nose.tools.ok_(ev.connect_path==[1, 3, 7], 
-                               'Failed path with id 7')
+                ok_(ev.connect_path==[1, 3, 7], 'Failed path with id 7')
             elif ev.id == 8:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8], 
-                               'Failed path with id 8')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
             elif ev.id == 9:
-                nose.tools.ok_(ev.connect_path==[1, 3, 9], 
-                               'Failed path with id 9')
+                ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
-                               'Failed path with id 10')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                    'Failed path with id 10')
             elif ev.id == 11:
-                nose.tools.ok_(ev.connect_path==[1, 3, 9, 11], 
-                               'Failed path with id 11')
+                ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
-                               'Failed path with id 12')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                    'Failed path with id 12')
 
     def test7_all_together(self):
         """Hierarchy: all together now"""
         qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
-        nose.tools.ok_(hasattr(rs[0], 'connect_path') == True, 
-                       "Fetched row has not got the 'connect_path' extra column")
-        nose.tools.ok_(hasattr(rs[0], 'level') == True, 
-                       "Fetched row has not got the 'level' extra column")
+        ok_(hasattr(rs[0], 'connect_path') == True, 
+            "Fetched row has not got the 'connect_path' extra column")
+        ok_(hasattr(rs[0], 'level') == True, 
+            "Fetched row has not got the 'level' extra column")
         for ev in rs:
-            nose.tools.ok_(ev.level==dummy_values[ev.id][0],
-                           "Wrong level for 'item %d'. Expected %d, got %d" %\
-                           (ev.id, dummy_values[ev.id][0], ev.level))
+            ok_(ev.level==dummy_values[ev.id][0], 
+                "Wrong level for 'item %d'. Expected %d, got %d" %\
+                (ev.id, dummy_values[ev.id][0], ev.level))
             if ev.id in (5,7,10,11,12):
-                nose.tools.ok_(ev.is_leaf == True, 
-                               'is_leaf failed. Expected True for %d' \
-                               %(ev.id))
+                ok_(ev.is_leaf == True, 'is_leaf failed. Expected True for %d' \
+                    %(ev.id))
             else:
-                nose.tools.ok_(ev.is_leaf == False, 
-                               'is_leaf failed. Expected False for %d' \
-                               %(ev.id))
+                ok_(ev.is_leaf == False, 
+                    'is_leaf failed. Expected False for %d' \
+                    %(ev.id))
             if ev.id == 1:
-                nose.tools.ok_(ev.connect_path==[1], 'Failed path with id 1')
+                ok_(ev.connect_path==[1], 'Failed path with id 1')
             elif ev.id == 2:
-                nose.tools.ok_(ev.connect_path==[1,2], 
-                               'Failed path with id 2')
+                ok_(ev.connect_path==[1,2], 'Failed path with id 2')
             elif ev.id == 3:
-                nose.tools.ok_(ev.connect_path==[1,3], 
-                               'Failed path with id 3')
+                ok_(ev.connect_path==[1,3], 'Failed path with id 3')
             elif ev.id == 4:
-                nose.tools.ok_(ev.connect_path==[1,2,4], 
-                               'Failed path with id 4')
+                ok_(ev.connect_path==[1,2,4], 'Failed path with id 4')
             elif ev.id == 5:
-                nose.tools.ok_(ev.connect_path==[1,3,5], 
-                               'Failed path with id 5')
+                ok_(ev.connect_path==[1,3,5], 'Failed path with id 5')
             elif ev.id == 6:
-                nose.tools.ok_(ev.connect_path==[1,2,4,6], 
-                               'Failed path with id 6')
+                ok_(ev.connect_path==[1,2,4,6], 'Failed path with id 6')
             elif ev.id == 7:
-                nose.tools.ok_(ev.connect_path==[1, 3, 7], 
-                               'Failed path with id 7')
+                ok_(ev.connect_path==[1, 3, 7], 'Failed path with id 7')
             elif ev.id == 8:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8], 
-                               'Failed path with id 8')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
             elif ev.id == 9:
-                nose.tools.ok_(ev.connect_path==[1, 3, 9], 
-                               'Failed path with id 9')
+                ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
-                               'Failed path with id 10')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                    'Failed path with id 10')
             elif ev.id == 11:
-                nose.tools.ok_(ev.connect_path==[1, 3, 9, 11], 
-                               'Failed path with id 11')
+                ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                nose.tools.ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
-                               'Failed path with id 12')
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                    'Failed path with id 12')
 
     def test8_where_clause(self):
         """Hierarchy: we pass a where clause, we expect it to be replicated in
@@ -260,6 +246,5 @@ class TestHierarchy(object):
         expected = [1,2,3,4,5,6,7,8,10,12]
         real = [v[0] for v in rs]
         real.sort()
-        nose.tools.ok_(expected==real, "We "
-                       "expect to get only the active nodes but we get "
+        ok_(expected==real, "We expect to get only the active nodes but we get "
                        "everything. Expected: %s, Got: %s" % (expected, real))
