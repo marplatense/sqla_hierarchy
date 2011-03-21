@@ -14,8 +14,6 @@ metadata = MetaData()
 engine = create_engine('postgresql://user:pass@localhost/db')
 DBSession.configure(bind=engine)
 metadata.bind = engine
-metadata.drop_all(engine)
-metadata.create_all(engine)
 
 dummy_tb = Table('dummy_hierarchy', metadata,
                  Column('id', Integer, primary_key=True),
