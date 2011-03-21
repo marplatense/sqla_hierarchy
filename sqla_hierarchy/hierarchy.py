@@ -26,8 +26,8 @@ class MissingForeignKey(HierarchyError):
         self.relation = relation
 
     def __str__(self):
-        return "A proper foreign key couldn't be found in relation "
-               "%s" % (self.relation)
+        return "A proper foreign key couldn't be found in relation %s" %\
+                (self.relation)
 
 class HierarchyLesserError(HierarchyError):
     """If the database version is lower than the version supported, this error
@@ -37,7 +37,7 @@ class HierarchyLesserError(HierarchyError):
         self.version = version
 
     def __str__(self):
-        return "This method hasn't been written for %s dialect/version "
+        return "This method hasn't been written for %s dialect/version "\
                "lesser than %s yet" % (self.dialect, 
                                        ".".join([str(x) for x in \
                                                  self.version]))
@@ -50,7 +50,7 @@ class HierarchyGreaterError(HierarchyError):
         self.version = version
 
     def __str__(self):
-        return "This method hasn't been written for %s dialect/version %s "
+        return "This method hasn't been written for %s dialect/version %s "\
                "(or greater) yet" % (self.dialect, 
                                      ".".join([str(x) for x in \
                                                self.version]))
