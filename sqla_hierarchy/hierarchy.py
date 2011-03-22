@@ -14,7 +14,7 @@ __all__ = ['Hierarchy', 'supported_db', 'HierarchyLesserError',
 
 supported_db = {
     'postgresql': (8,4,0),
-    'oracle': (9,0,0) # actually this is a lie right now
+    'oracle': (10,0,0)
     }
 
 class HierarchyError(Exception):
@@ -151,6 +151,34 @@ def visit_hierarchy(element, compiler, **kw):
     raise(NotImplementedError("This method hasn't been written "
                               "for %s dialect yet" % (compiler.dialect.name))
          )
+
+@compiles(Hierarchy, 'oracle')
+def visit_hierarchy(element, compiler, **kw):
+    """visit compilation idiom for oracle"""
+    if compiler.dialect.server_version_info < supported_db['oracle']:
+        raise(HierarchyLesserError(compiler.dialect.name, 
+                                   supported_db['oracle']))
+    else:
+        sel = element.select
+        sel.append_column(literal_column('level', type_=Integer))
+        sel.append_column(literal_column('CONNECT_BY_ISLEAF', 
+                                         type_=Boolean).label('is_leaf'))
+        sel.append_column(literal_column(
+            "LTRIM(SYS_CONNECT_BY_PATH (%s,','),',')" % (element.child),
+            type_=String).label('connect_path'))
+        qry = ""
+        if hasattr(element, 'starting_node') and \
+           getattr(element, 'starting_node') is not False:
+            if (element.starting_node == "a" and element.fk_type==String) or\
+               (element.starting_node == "0" and element.fk_type==Integer):
+                qry = "%s start with %s is null" % (compiler.process(sel),
+                                                    element.parent)
+            else:
+                qry = "%s start with %s=$s" % (compiler.process(sel), 
+                                               element.parent,
+                                               element.starting_node)
+        qry += " connect by prior %s=%s" % (element.child, element.parent)
+        return qry
 
 @compiles(Hierarchy, 'postgresql')
 def visit_hierarchy(element, compiler, **kw):

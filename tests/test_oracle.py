@@ -30,7 +30,6 @@ class Dummy(object):
     def __init__(self, **kw):
         for k, v in kw.iteritems():
             setattr(self, k, v)
-
     def __repr__(self):
         return "Dummy<%d, %s, %s>" %(self.id, self.name, self.parent_id)
 
