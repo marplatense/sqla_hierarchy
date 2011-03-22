@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 """"Testing hierarchy dialect in sqlalchemy"""
+import ConfigParser
 from exceptions import NotImplementedError
 from nose.tools import *
 
@@ -7,11 +8,13 @@ from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
 from sqlalchemy import Integer, Unicode, Boolean
 from sqlalchemy import select, and_
 from sqlalchemy.orm import mapper, relationship, scoped_session, sessionmaker
-from sqla_hierarchy import hierarchy as hie
+from sqla_hierarchy import *
 
 DBSession = scoped_session(sessionmaker())
 metadata = MetaData()
-engine = create_engine('postgresql://user:pass@localhost/db')
+config = ConfigParser.ConfigParser() 
+config.read('setup.cfg')
+engine = create_engine('postgresql://%s' % config.get('dburi', 'pg-db'))
 DBSession.configure(bind=engine)
 metadata.bind = engine
 
@@ -85,9 +88,9 @@ def setup():
     DBSession.add_all(xlist)
     DBSession.flush()
     try:
-        transaction.commit()
+        DBSession.commit()
     except Exception as generalerror:
-        transaction.rollback()
+        DBSession.rollback()
         raise(HierarchyTestError(generalerror))
 
 class TestHierarchy(object):
@@ -96,31 +99,31 @@ class TestHierarchy(object):
         """Hierarchy: check the supported version"""
         db_vendor, db_version = DBSession.bind.name, \
                                 DBSession.bind.dialect.server_version_info
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
-        if db_vendor not in hie.supported_db:
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
+        if db_vendor not in supported_db:
             assert_raises(NotImplementedError, 
                                      DBSession.execute(qry).fetchall())
         else:
-            if db_version < hie.supported_db[db_vendor]:
-                assert_raises(hie.HierarchyLesserError, 
+            if db_version < supported_db[db_vendor]:
+                assert_raises(HierarchyLesserError, 
                                          DBSession.execute(qry).fetchall())
 
     def test2_fk_error(self):
         """Hierarchy: When selecting a table with no fk->pk in the same table, 
         we should raise an error"""
-        assert_raises(hie.MissingForeignKey, hie.Hierarchy, 
+        assert_raises(MissingForeignKey, Hierarchy, DBSession,
                       no_fk_tb, select([no_fk_tb]))
 
     def test3_execute(self):
         """Hierarchy: just to see if it works"""
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb]))
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
         ok_(12 == len(rs), 'Test should return 12 rows but instead it returns '
             '%d' %(len(rs)))
 
     def test4_level_attr(self):
         """Hierarchy: fetching the extra 'level' column"""
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'level') == True, 
             "Fetched row has not got the 'level' extra column")
@@ -133,7 +136,7 @@ class TestHierarchy(object):
     def test5_is_leaf(self):
         """Hierarchy: requesting the extra column 'is_leaf' and getting
         it"""
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb]))
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'is_leaf') == True, 
             "Fetched row has not got the 'is_leaf' extra column")
@@ -151,7 +154,7 @@ class TestHierarchy(object):
     def test6_connect_path(self):
         """Hierarchy: if present 'connect_path' in kw, we should return the
         path using the sep character defined by the user"""
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'connect_path') == True, 
             "Fetched row has not got the 'connect_path' extra column")
@@ -186,7 +189,7 @@ class TestHierarchy(object):
 
     def test7_all_together(self):
         """Hierarchy: all together now"""
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'connect_path') == True, 
             "Fetched row has not got the 'connect_path' extra column")
@@ -238,7 +241,7 @@ class TestHierarchy(object):
         v1.active = False
         v2.active = False
         DBSession.flush()
-        qry = hie.Hierarchy(dummy_tb, select([dummy_tb.c.id],
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb.c.id],
                                              dummy_tb.c.active==True)) 
         rs = DBSession.execute(qry).fetchall()
         expected = [1,2,3,4,5,6,7,8,10,12]

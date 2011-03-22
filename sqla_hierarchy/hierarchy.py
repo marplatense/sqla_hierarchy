@@ -9,6 +9,8 @@ from sqlalchemy.dialects.postgresql.base import ARRAY
 from sqlalchemy.sql.expression import (
     Executable, ClauseElement, TableClause, ColumnClause
 )
+__all__ = ['Hierarchy', 'supported_db', 'HierarchyLesserError',
+           'MissingForeignKey']
 
 supported_db = {
     'postgresql': (8,4,0),
