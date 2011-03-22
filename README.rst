@@ -23,3 +23,21 @@ Special remarks:
 -------------
 Some examples
 -------------
+
+First of all, let's set up some imports and variables we will be using ::
+
+    >>> import ConfigParser
+    >>> from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
+    >>> from sqlalchemy import Integer, Unicode, Boolean
+    >>> from sqlalchemy import select, and_
+    >>> from sqlalchemy.orm import mapper, relationship, scoped_session, sessionmaker
+    >>> from sqla_hierarchy import *
+    >>> DBSession = scoped_session(sessionmaker())
+    >>> metadata = MetaData()
+    >>> config = ConfigParser.ConfigParser() 
+    >>> config.read('setup.cfg')
+    ['setup.cfg']
+    >>> engine = create_engine('postgresql://%s' % config.get('dburi', 'pg-db'))
+    >>> DBSession.configure(bind=engine)
+    >>> metadata.bind = engine
+
