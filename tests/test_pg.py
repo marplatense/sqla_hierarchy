@@ -96,33 +96,28 @@ def setup():
 class TestHierarchy(object):
 
     def test1_dialect(self):
-        """Hierarchy: check the supported version"""
+        """Hierarchy pgsql: check the supported version"""
         db_vendor, db_version = DBSession.bind.name, \
                                 DBSession.bind.dialect.server_version_info
+        if db_version < supported_db[db_vendor]:
+            assert_raises(HierarchyLesserError, DBSession.execute, qry)
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
-        if db_vendor not in supported_db:
-            assert_raises(NotImplementedError, 
-                                     DBSession.execute(qry).fetchall())
-        else:
-            if db_version < supported_db[db_vendor]:
-                assert_raises(HierarchyLesserError, 
-                                         DBSession.execute(qry).fetchall())
 
     def test2_fk_error(self):
-        """Hierarchy: When selecting a table with no fk->pk in the same table, 
-        we should raise an error"""
+        """Hierarchy pgsql: When selecting a table with no fk->pk in the same 
+        table, we should raise an error"""
         assert_raises(MissingForeignKey, Hierarchy, DBSession,
                       no_fk_tb, select([no_fk_tb]))
 
     def test3_execute(self):
-        """Hierarchy: just to see if it works"""
+        """Hierarchy pgsql: just to see if it works"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
         ok_(12 == len(rs), 'Test should return 12 rows but instead it returns '
             '%d' %(len(rs)))
 
     def test4_level_attr(self):
-        """Hierarchy: fetching the extra 'level' column"""
+        """Hierarchy pgsql: fetching the extra 'level' column"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'level') == True, 
@@ -134,7 +129,7 @@ class TestHierarchy(object):
                            (ev.id, dummy_values[ev.id][0], ev.level))
 
     def test5_is_leaf(self):
-        """Hierarchy: requesting the extra column 'is_leaf' and getting
+        """Hierarchy pgsql: requesting the extra column 'is_leaf' and getting
         it"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
@@ -152,8 +147,8 @@ class TestHierarchy(object):
                                %(every.id))
 
     def test6_connect_path(self):
-        """Hierarchy: if present 'connect_path' in kw, we should return the
-        path using the sep character defined by the user"""
+        """Hierarchy pgsql: if present 'connect_path' in kw, we should return 
+        the path using the sep character defined by the user"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'connect_path') == True, 
@@ -188,7 +183,7 @@ class TestHierarchy(object):
                     'Failed path with id 12')
 
     def test7_all_together(self):
-        """Hierarchy: all together now"""
+        """Hierarchy pgsql: all together now"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
         ok_(hasattr(rs[0], 'connect_path') == True, 
@@ -234,8 +229,8 @@ class TestHierarchy(object):
                     'Failed path with id 12')
 
     def test8_where_clause(self):
-        """Hierarchy: we pass a where clause, we expect it to be replicated in
-        every subquery"""
+        """Hierarchy pgsql: we pass a where clause, we expect it to be 
+        replicated in every subquery"""
         v1 = DBSession.query(Dummy).get(9)
         v2 = DBSession.query(Dummy).get(11)
         v1.active = False

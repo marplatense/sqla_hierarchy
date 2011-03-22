@@ -28,8 +28,7 @@ First of all, let's set up some imports and variables we will be using ::
 
     >>> import ConfigParser
     >>> from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
-    >>> from sqlalchemy import Integer, Unicode, Boolean
-    >>> from sqlalchemy import select, and_
+    >>> from sqlalchemy import Unicode, select, and_
     >>> from sqlalchemy.orm import mapper, relationship, scoped_session, sessionmaker
     >>> from sqla_hierarchy import *
     >>> DBSession = scoped_session(sessionmaker())
@@ -41,3 +40,61 @@ First of all, let's set up some imports and variables we will be using ::
     >>> DBSession.configure(bind=engine)
     >>> metadata.bind = engine
 
+Let's build some simple table/class to hold boss/employee relation ::
+
+    >>> example_tb = Table('employee', metadata,  
+    ...                    Column('id', Unicode, primary_key=True), 
+    ...                    Column('boss', Unicode, ForeignKey('employee.id')))
+    >>> class Employee(object): 
+    ...     def __init__(self, employee, boss=None): 
+    ...         self.id = employee
+    ...         self.boss = boss
+    ...     def __repr__(self): 
+    ...         return "<Employee %s, Boss %s>" % (self.id, self.boss) 
+    ...  
+    >>> mapper(Employee, example_tb, properties={  #doctest: +ELLIPSIS
+    ...        'parent': relationship(Employee, remote_side=[example_tb.c.id])}) 
+    <Mapper at 0x...; Employee>
+    >>> example_tb.drop(checkfirst=True)
+    >>> example_tb.create(checkfirst=True)
+
+Add some data ::
+
+    >>> pl = [Employee(u'King Cold', None), Employee(u'Frieza', u'King Cold'), 
+    ...       Employee(u'Zarbon', u'Frieza'), Employee(u'Dodoria', u'Frieza'), 
+    ...       Employee(u'Captain Ginyu', u'Frieza'), 
+    ...       Employee(u'Jeice', u'Captain Ginyu'),
+    ...       Employee(u'Burter', u'Captain Ginyu'),
+    ...       Employee(u'Recoome', u'Captain Ginyu'),
+    ...       Employee(u'Guldo', u'Captain Ginyu'),
+    ...       Employee(u'Dr Gero', None), Employee(u'A-16', u'Dr Gero'), 
+    ...       Employee(u'A-17', u'Dr Gero'), Employee(u'A-18', u'Dr Gero'), 
+    ...       Employee(u'Cell', u'Dr Gero'), Employee(u'Cell Junior', u'Cell')] 
+    >>> DBSession.add_all(pl)
+    >>> DBSession.commit()
+
+Now let's query some basic relations. First we want a list of bosses and employees using some indentation to visually understand who depends on who ::
+
+    >>> qry = Hierarchy(DBSession, example_tb, select([example_tb])) 
+    >>> rs = DBSession.execute(qry).fetchall()
+    >>> for ev in rs:
+    ...     if ev.level == 1:
+    ...         print(ev.id)
+    ...     else:
+    ...         print(" "*2*ev.level+ev.id) 
+    Dr Gero
+        A-16
+        A-17
+        A-18
+        Cell
+          Cell Junior
+    King Cold
+        Frieza
+          Captain Ginyu
+            Burter
+            Guldo
+            Jeice
+            Recoome
+          Dodoria
+          Zarbon
+         
