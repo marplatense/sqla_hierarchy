@@ -97,4 +97,31 @@ Now let's query some basic relations. First we want a list of bosses and employe
             Recoome
           Dodoria
           Zarbon
-         
+
+Let's take a look at the special attributes sqla_hierachy added ::
+
+    >>> print(rs[0])
+    (u'Dr Gero', None, 1, ['Dr Gero'], False)
+
+The relative position of this record in the tree. '1' means he/she is the root. The higher the number, the bigger the distance is between the root and the current record ::
+
+    >>> print(rs[0].level)
+    1
+
+Print the full list of members of this relation: from the root up to the current record::
+
+    >> print(rs[0].connect_path)
+    ['Dr Gero']
+
+Is_leaf is True, this record has no more dependents. If False, there are more records that depend on him/her::
+
+    >>> print(rs[0].is_leaf)
+    False
+    
+Now an example with a record that is a leaf ::
+
+    >>> print(rs[9].level, rs[9].is_leaf)
+    (4, True)
+    >>> print(rs[9].connect_path)
+    ['King Cold', 'Frieza', 'Captain Ginyu', 'Burter']
+
