@@ -8,7 +8,7 @@ setup(
     name='sqla_hierarchy',
     packages=['sqla_hierarchy'],
     version='0.1',
-    description='Adjacency List Relationships helper (we use the db own idioms to provide it)',
+    description='Adjacency List Relationships helper (only using databases own implementations)',
     long_description=README_TEXT,
     author='Mariano Mara',
     author_email='mariano.mara@gmail.com',

@@ -44,19 +44,6 @@ class HierarchyLesserError(HierarchyError):
                                        ".".join([str(x) for x in \
                                                  self.version]))
 
-class HierarchyGreaterError(HierarchyError):
-    """If the database version is higher that the version supported, this error
-    will be raised"""
-    def __init__(self, dialect, version):
-        self.dialect = dialect
-        self.version = version
-
-    def __str__(self):
-        return "This method hasn't been written for %s dialect/version %s "\
-               "(or greater) yet" % (self.dialect, 
-                                     ".".join([str(x) for x in \
-                                               self.version]))
-
 def _build_table_clause(select, name, path_type):
     """For pgsql, it builds the recursive table needed to perform a
     hierarchical query.
@@ -104,8 +91,7 @@ class Hierarchy(Executable, ClauseElement):
           in the query. By default the system will add a 'starting_node'="0". If
           you don't want a starting node, pass 'starting_node'=False and the
           clause will not be added to the query
-    For examples of Hierarchy, check the tests dir (test1_hierarchy.py in
-    particular)
+    For examples of Hierarchy, check the tests dir.
     """
     def __init__(self, Session, table, select, **kw):
         self.table = table
@@ -166,17 +152,17 @@ def visit_hierarchy(element, compiler, **kw):
         sel.append_column(literal_column(
             "LTRIM(SYS_CONNECT_BY_PATH (%s,','),',')" % (element.child),
             type_=String).label('connect_path'))
-        qry = ""
+        qry = "%s"  % (compiler.process(sel))
         if hasattr(element, 'starting_node') and \
            getattr(element, 'starting_node') is not False:
             if (element.starting_node == "a" and element.fk_type==String) or\
                (element.starting_node == "0" and element.fk_type==Integer):
-                qry = "%s start with %s is null" % (compiler.process(sel),
-                                                    element.parent)
+                qry += " start with %s is null" % (element.parent)
+            elif getattr(element, 'starting_node') is False:
+                pass
             else:
-                qry = "%s start with %s=$s" % (compiler.process(sel), 
-                                               element.parent,
-                                               element.starting_node)
+                qry += " start with %s=%s" % (element.parent, 
+                                             element.starting_node)
         qry += " connect by prior %s=%s" % (element.child, element.parent)
         return qry
 

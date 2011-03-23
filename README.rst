@@ -9,7 +9,7 @@ Description
 Given a `Table`_ object and a `Select`_ expression, this class will return the information from these objects with some extra columns that will properly denote the hierarchical relation between the rows. The returned Hierarchy object could then be executed and it will return the same Select statement submitted plus the following columns:
 
 - level: the relative level of the row related to its parent
-- connect_path: a list with all the ids that compound this part of the hierarchy, from the root node to the current value
+- connect_path: a list with all the ids that compound this part of the hierarchy, from the root node to the current value (**IMPORTANT**: Oracle requires some extra post processing to generate the list) 
 - is_leaf: boolean indicating is the particular id is a leaf or not
 
 The resultset will be returned properly ordered by the levels in the hierarchy
@@ -17,7 +17,7 @@ The resultset will be returned properly ordered by the levels in the hierarchy
 Special remarks:
 
 - The selected table must have a self referential foreign key relation, otherwise it will raise MissingForeignKey
-- Not every database is supported (at the moment). Check the global var supported_db for an up2date list. Trying to execute Hierarchy with an unsupported db will raise NotImplementedError or HierarchyLesserError or HierarchyGreaterError (check the errors classes docstring for the exact meaning of each of them).
+- Not every database is supported (at the moment). Check the global var supported_db for an up2date list. Trying to execute Hierarchy with an unsupported db will raise NotImplementedError or HierarchyLesserError (check the errors classes docstring for the exact meaning of each of them).
 - To prevent the query from returning every node as a different starting node and, therefore, having duplicate values, you can provide the 'starting_node' parameter in the kwargs. The value you must provide is the parent id for the root node you want to start building the hierarchical tree. None has the same meaning as "0" since we perform a coalesce function in the query. By default the system will add a 'starting_node'="0". If you don't want a starting node, pass 'starting_node'=False and the clause will not be added to the query
 
 *Supported databases*:
@@ -118,17 +118,17 @@ Let's take a look at the special attributes sqla_hierachy added ::
     >>> print(rs[0])
     (u'Dr Gero', None, 1, ['Dr Gero'], False)
 
-The relative position of this record in the tree. '1' means he/she is the root. The higher the number, the bigger the distance is between the root and the current record ::
+*Level*: The relative position of this record in the tree. '1' means he/she is the root. The higher the number, the bigger the distance is between the root and the current record ::
 
     >>> print(rs[0].level)
     1
 
-Print the full list of members of this relation: from the root up to the current record::
+*Connect Path*: Print the full list of members of this relation: from the root up to the current record::
 
     >> print(rs[0].connect_path)
     ['Dr Gero']
 
-Is_leaf is True, this record has no more dependents. If False, there are more records that depend on him/her::
+*Is Leaf*: If is_leaf is True, this record has no more dependents. If False, there are more records that depend on him/her::
 
     >>> print(rs[0].is_leaf)
     False

@@ -3,6 +3,7 @@
 import ConfigParser
 from exceptions import NotImplementedError
 from nose.tools import *
+from mock import Mock
 
 from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
 from sqlalchemy import Integer, Unicode, Boolean
@@ -94,28 +95,20 @@ def setup():
 
 class TestHierarchy(object):
 
-    def test1_dialect(self):
-        """Hierarchy oracle: check the supported version"""
-        db_vendor, db_version = DBSession.bind.name, \
-                                DBSession.bind.dialect.server_version_info
-        if db_version < supported_db[db_vendor]:
-            assert_raises(HierarchyLesserError, DBSession.execute, qry)
-        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
-
-    def test2_fk_error(self):
+    def test1_fk_error(self):
         """Hierarchy oracle: When selecting a table with no fk->pk in the same 
         table, we should raise an error"""
         assert_raises(MissingForeignKey, Hierarchy, DBSession,
                       no_fk_tb, select([no_fk_tb]))
 
-    def test3_execute(self):
+    def test2_execute(self):
         """Hierarchy oracle: just to see if it works"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
         ok_(12 == len(rs), 'Test should return 12 rows but instead it returns '
             '%d' %(len(rs)))
 
-    def test4_level_attr(self):
+    def test3_level_attr(self):
         """Hierarchy oracle: fetching the extra 'level' column"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
@@ -127,7 +120,7 @@ class TestHierarchy(object):
                 "Wrong level for 'item %d'. Expected %d, got %d" %\
                            (ev.id, dummy_values[ev.id][0], ev.level))
 
-    def test5_is_leaf(self):
+    def test4_is_leaf(self):
         """Hierarchy oracle: requesting the extra column 'is_leaf' and getting
         it"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
@@ -145,7 +138,7 @@ class TestHierarchy(object):
                     'is_leaf failed. Expected False for %d' \
                                %(every.id))
 
-    def test6_connect_path(self):
+    def test5_connect_path(self):
         """Hierarchy oracle: if present 'connect_path' in kw, we should return 
         the path using the sep character defined by the user"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
@@ -154,34 +147,35 @@ class TestHierarchy(object):
             "Fetched row has not got the 'connect_path' extra column")
         # let's check the paths
         for ev in rs:
+            connect_path = [int(x) for x in ev.connect_path.split(',')]
             if ev.id == 1:
-                ok_(ev.connect_path==[1], 'Failed path with id 1')
+                eq_(connect_path, [1])
             elif ev.id == 2:
-                ok_(ev.connect_path==[1,2], 'Failed path with id 2')
+                ok_(connect_path==[1,2], 'Failed path with id 2')
             elif ev.id == 3:
-                ok_(ev.connect_path==[1,3], 'Failed path with id 3')
+                ok_(connect_path==[1,3], 'Failed path with id 3')
             elif ev.id == 4:
-                ok_(ev.connect_path==[1,2,4], 'Failed path with id 4')
+                ok_(connect_path==[1,2,4], 'Failed path with id 4')
             elif ev.id == 5:
-                ok_(ev.connect_path==[1,3,5], 'Failed path with id 5')
+                ok_(connect_path==[1,3,5], 'Failed path with id 5')
             elif ev.id == 6:
-                ok_(ev.connect_path==[1,2,4,6], 'Failed path with id 6')
+                ok_(connect_path==[1,2,4,6], 'Failed path with id 6')
             elif ev.id == 7:
-                ok_(ev.connect_path==[1, 3, 7], 'Failed path with id 7')
+                ok_(connect_path==[1, 3, 7], 'Failed path with id 7')
             elif ev.id == 8:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
+                ok_(connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
             elif ev.id == 9:
-                ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
+                ok_(connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                ok_(connect_path==[1, 2, 4, 6, 8, 10], 
                     'Failed path with id 10')
             elif ev.id == 11:
-                ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
+                ok_(connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                ok_(connect_path==[1, 2, 4, 6, 8, 12], 
                     'Failed path with id 12')
 
-    def test7_all_together(self):
+    def test6_all_together(self):
         """Hierarchy oracle: all together now"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
         rs = DBSession.execute(qry).fetchall()
@@ -190,6 +184,7 @@ class TestHierarchy(object):
         ok_(hasattr(rs[0], 'level') == True, 
             "Fetched row has not got the 'level' extra column")
         for ev in rs:
+            connect_path = [int(x) for x in ev.connect_path.split(',')]
             ok_(ev.level==dummy_values[ev.id][0], 
                 "Wrong level for 'item %d'. Expected %d, got %d" %\
                 (ev.id, dummy_values[ev.id][0], ev.level))
@@ -201,31 +196,41 @@ class TestHierarchy(object):
                     'is_leaf failed. Expected False for %d' \
                     %(ev.id))
             if ev.id == 1:
-                ok_(ev.connect_path==[1], 'Failed path with id 1')
+                ok_(connect_path==[1], 'Failed path with id 1')
             elif ev.id == 2:
-                ok_(ev.connect_path==[1,2], 'Failed path with id 2')
+                ok_(connect_path==[1,2], 'Failed path with id 2')
             elif ev.id == 3:
-                ok_(ev.connect_path==[1,3], 'Failed path with id 3')
+                ok_(connect_path==[1,3], 'Failed path with id 3')
             elif ev.id == 4:
-                ok_(ev.connect_path==[1,2,4], 'Failed path with id 4')
+                ok_(connect_path==[1,2,4], 'Failed path with id 4')
             elif ev.id == 5:
-                ok_(ev.connect_path==[1,3,5], 'Failed path with id 5')
+                ok_(connect_path==[1,3,5], 'Failed path with id 5')
             elif ev.id == 6:
-                ok_(ev.connect_path==[1,2,4,6], 'Failed path with id 6')
+                ok_(connect_path==[1,2,4,6], 'Failed path with id 6')
             elif ev.id == 7:
-                ok_(ev.connect_path==[1, 3, 7], 'Failed path with id 7')
+                ok_(connect_path==[1, 3, 7], 'Failed path with id 7')
             elif ev.id == 8:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
+                ok_(connect_path==[1, 2, 4, 6, 8], 'Failed path with id 8')
             elif ev.id == 9:
-                ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
+                ok_(connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                ok_(connect_path==[1, 2, 4, 6, 8, 10], 
                     'Failed path with id 10')
             elif ev.id == 11:
-                ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
+                ok_(connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                ok_(connect_path==[1, 2, 4, 6, 8, 12], 
                     'Failed path with id 12')
+
+    def test7_where_clause(self):
+        """Hierarchy oracle: we pass a starting node"""
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb.c.id]),
+                        **{'starting_node':3}) 
+        rs = DBSession.execute(qry).fetchall()
+        expected = [5,7,9,11]
+        real = [v[0] for v in rs]
+        real.sort()
+        eq_(expected, real)
 
     def test8_where_clause(self):
         """Hierarchy oracle: we pass a where clause, we expect it to be 
@@ -243,3 +248,13 @@ class TestHierarchy(object):
         real.sort()
         ok_(expected==real, "We expect to get only the active nodes but we get "
                        "everything. Expected: %s, Got: %s" % (expected, real))
+
+    def test9_dialect(self):
+        """Hierarchy oracle: check the supported version"""
+        DBSession.bind.dialect.server_version_info = Mock(return_value=(9,0,0))
+        db_vendor, db_version = DBSession.bind.name, \
+                                DBSession.bind.dialect.server_version_info
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
+        if db_version < supported_db[db_vendor]:
+            assert_raises(HierarchyLesserError, DBSession.execute, qry)
+
