@@ -89,9 +89,9 @@ def setup():
     DBSession.flush()
     try:
         DBSession.commit()
-    except Exception as generalerror:
+    except Exception, e:
         DBSession.rollback()
-        raise(HierarchyTestError(generalerror))
+        raise(HierarchyTestError(e.args[0]))
 
 class TestHierarchy(object):
 
