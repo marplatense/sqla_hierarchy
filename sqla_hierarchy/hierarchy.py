@@ -7,7 +7,7 @@ from sqlalchemy.sql.expression import func, literal_column, label, literal, cast
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.postgresql.base import ARRAY
 from sqlalchemy.sql.expression import (
-    Executable, ClauseElement, TableClause, ColumnClause
+    Select, TableClause, ColumnClause
 )
 __all__ = ['Hierarchy', 'supported_db', 'HierarchyLesserError',
            'MissingForeignKey']
@@ -61,7 +61,7 @@ def _build_table_clause(select, name, path_type):
     tb = TableClause(name, *cols)
     return tb
 
-class Hierarchy(Executable, ClauseElement):
+class Hierarchy(Select):
     """Given a sqlalchemy.schema.Table and a sqlalchemy.sql.expression.Select,
     this class will return the information from these objects with some extra
     columns that will properly denote the hierarchical relation between the
@@ -109,8 +109,7 @@ class Hierarchy(Executable, ClauseElement):
                 break
         if self.parent is None or self.child is None:
             raise(MissingForeignKey(self.table.name))
-        for k, v in kw.iteritems():
-            setattr(self, k, v)
+        self.starting_node = kw.pop('starting_node', None)
         # if starting node does not exist or it's null, we add starting_node=0
         # by default
         if not hasattr(self, 'starting_node') or self.starting_node is None:
@@ -129,6 +128,12 @@ class Hierarchy(Executable, ClauseElement):
             # we need to be sure the starting_node value is an String, 
             # otherwise we might get an error
             self.starting_node = str(self.starting_node)
+        columns = select.columns + [
+            ColumnClause('level', Integer()),
+            ColumnClause('connect_path', ARRAY(self.fk_type)),
+            ColumnClause('as_leaf', Boolean())
+        ]
+        Select.__init__(self, columns, **kw)
 
 @compiles(Hierarchy)
 def visit_hierarchy(element, compiler, **kw):
@@ -164,6 +169,8 @@ def visit_hierarchy(element, compiler, **kw):
                 qry += " start with %s=%s" % (element.parent, 
                                              element.starting_node)
         qry += " connect by prior %s=%s" % (element.child, element.parent)
+        if kw.get('asfrom', False):
+            qry = '(%s)' % qry
         return qry
 
 @compiles(Hierarchy, 'postgresql')
@@ -247,4 +254,6 @@ def visit_hierarchy(element, compiler, **kw):
         )
         qry = "with recursive rec as (%s) %s order by connect_path" %\
                 (compiler.process(sel3), new_sel)
+        if kw.get('asfrom', False):
+            qry = '(%s)' % qry
         return qry
