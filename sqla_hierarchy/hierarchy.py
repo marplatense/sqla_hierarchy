@@ -187,7 +187,8 @@ def visit_hierarchy(element, compiler, **kw):
         #   postgresql-8-4-preserving-order-for-hierarchical-query/
         #
         # build the first select
-        sel1 = element.select
+        sel1 = element.select._clone()
+        sel1._copy_internals()
         # if the user wants to start from a given node, he pass the
         # starting_node option in the query
         if hasattr(element, 'starting_node') and \
@@ -210,7 +211,8 @@ def visit_hierarchy(element, compiler, **kw):
         # the same select as above plus the level column is summing a 1 for
         # each iteration on the same brach. We also append the current id to
         # the array of ids we're building as connect_path
-        sel2 = element.select
+        sel2 = element.select._clone()
+        sel2._copy_internals()
         sel2.append_column(label('level', 
                                  rec.c.level+literal_column("1",
                                                             type_=Integer)))
