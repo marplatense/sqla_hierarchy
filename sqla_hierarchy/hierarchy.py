@@ -129,9 +129,9 @@ class Hierarchy(Select):
             # otherwise we might get an error
             self.starting_node = str(self.starting_node)
         columns = select.columns + [
-            ColumnClause('level', Integer()),
-            ColumnClause('connect_path', ARRAY(self.fk_type)),
-            ColumnClause('as_leaf', Boolean())
+            ColumnClause('level', type_=Integer()),
+            ColumnClause('connect_path', type_=ARRAY(self.fk_type)),
+            ColumnClause('as_leaf', type_=Boolean())
         ]
         Select.__init__(self, columns, **kw)
 
