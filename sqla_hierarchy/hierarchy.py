@@ -44,7 +44,7 @@ class HierarchyLesserError(HierarchyError):
                                        ".".join([str(x) for x in \
                                                  self.version]))
 
-def _build_table_clause(select, name, path_type):
+def _build_table_clause(select, name, path_type, ordering_colname=None, ordering_coltype=Integer):
     """For pgsql, it builds the recursive table needed to perform a
     hierarchical query.
     Parameters:
@@ -56,8 +56,10 @@ def _build_table_clause(select, name, path_type):
     cols = []
     for ev in select.columns.keys():
         cols.append(ColumnClause(ev, type_=getattr(select.columns, ev).type))
-    cols.append(ColumnClause('level', Integer))
-    cols.append(ColumnClause('connect_path', ARRAY(path_type)))
+    cols.append(ColumnClause('level', type_=Integer))
+    cols.append(ColumnClause('connect_path', type_=ARRAY(path_type)))
+    if ordering_colname:
+        cols.append(ColumnClause('%s_path' % ordering_colname, type_=ARRAY(ordering_coltype)))
     tb = TableClause(name, *cols)
     return tb
 
@@ -71,6 +73,12 @@ class Hierarchy(Select):
         * level: the relative level of the row related to its parent
         * connect_path: a list with all the ids that compound this part of the
                         hierarchy, from the root node to the current value
+        * ordering_path: a list with all the ordering values that order this
+                         element of the hierarchy, from the root node to the
+                         current value. Named `%s_path` if `ordering_colname`
+                         is set to something other than the default `ordering`.
+                         Absent if underlying table doesn't have the ordering
+                         column.
         * is_leaf: boolean indicating is the particular id is a leaf or not
     The resultset will be returned properly ordered by the levels in the
     hierarchy
@@ -110,6 +118,7 @@ class Hierarchy(Select):
         if self.parent is None or self.child is None:
             raise(MissingForeignKey(self.table.name))
         self.starting_node = kw.pop('starting_node', None)
+        self.ordering_colname = kw.pop('ordering_colname', 'ordering')
         # if starting node does not exist or it's null, we add starting_node=0
         # by default
         if not hasattr(self, 'starting_node') or self.starting_node is None:
@@ -133,6 +142,9 @@ class Hierarchy(Select):
             ColumnClause('connect_path', type_=ARRAY(self.fk_type)),
             ColumnClause('as_leaf', type_=Boolean())
         ]
+        if self.ordering_colname in select.columns:
+            columns.append(ColumnClause('%s_path' % self.ordering_colname,
+                                        type_=ARRAY(select.c[self.ordering_colname].type)))
         Select.__init__(self, columns, **kw)
 
 @compiles(Hierarchy)
@@ -186,7 +198,12 @@ def visit_hierarchy(element, compiler, **kw):
         else:
             element.fk_type = Integer
             val = "0"
-        rec = _build_table_clause(element.select, 'rec', element.fk_type) 
+        ordering_colname = element.ordering_colname
+        if not ordering_colname or ordering_colname not in element.table.c\
+                and ordering_colname not in element.select.c:
+            ordering_colname = None
+        # FIXME: pass type of ordering column in following call if it's not Integer
+        rec = _build_table_clause(element.select, 'rec', element.fk_type, ordering_colname)
         # documentation used for pgsql >= 8.4.0
         #
         # * http://www.postgresql.org/docs/8.4/static/queries-with.html
@@ -210,6 +227,14 @@ def visit_hierarchy(element, compiler, **kw):
         sel1.append_column(literal_column('ARRAY[%s]' %(element.child), 
                                           type_=ARRAY(element.fk_type)).\
                            label('connect_path'))
+        if ordering_colname:
+            ordering_col = sel1.c.get(ordering_colname, None)
+            if ordering_col is None:
+                ordering_col = element.table.c[ordering_colname]
+            sel1.append_column(literal_column('ARRAY[%s]' % (ordering_colname,),
+                                              type_=ARRAY(ordering_col.type)).\
+                               label('%s_path' % (ordering_colname,))
+            )
         # the non recursive part of the with query must return false for the
         # first values
         sel1.append_column(literal_column("false", type_=Boolean).\
@@ -226,6 +251,11 @@ def visit_hierarchy(element, compiler, **kw):
         sel2.append_column(label('connect_path', 
                       func.array_append(rec.c.connect_path, 
                                         getattr(element.table.c, element.child))
+                                ))
+        if ordering_colname:
+            sel2.append_column(label('%s_path' % (ordering_colname),
+                      func.array_append(rec.c['%s_path' % (ordering_colname,)],
+                                        getattr(element.table.c, ordering_colname))
                                 ))
         # check if any member of connect_path has already been visited and
         # return true in that case, preventing an infinite loop (see where
@@ -252,8 +282,11 @@ def visit_hierarchy(element, compiler, **kw):
                            "(order by connect_path) when true then false "\
                            "else true end").label('is_leaf')
         )
-        qry = "with recursive rec as (%s) %s order by connect_path" %\
-                (compiler.process(sel3), new_sel)
+        qry = "with recursive rec as (%s) %s order by %s_path" %\
+                (compiler.process(sel3),
+                 new_sel,
+                 ordering_colname if ordering_colname else 'connect'
+                )
         if kw.get('asfrom', False):
             qry = '(%s)' % qry
         return qry
