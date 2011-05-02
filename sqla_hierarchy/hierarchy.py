@@ -140,7 +140,7 @@ class Hierarchy(Select):
         columns = select.columns + [
             ColumnClause('level', type_=Integer()),
             ColumnClause('connect_path', type_=ARRAY(self.fk_type)),
-            ColumnClause('as_leaf', type_=Boolean())
+            ColumnClause('is_leaf', type_=Boolean())
         ]
         if self.ordering_colname in select.columns:
             columns.append(ColumnClause('%s_path' % self.ordering_colname,
