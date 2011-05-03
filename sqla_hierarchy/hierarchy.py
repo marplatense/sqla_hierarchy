@@ -203,7 +203,8 @@ def visit_hierarchy(element, compiler, **kw):
                 and ordering_colname not in element.select.c:
             ordering_colname = None
         # FIXME: pass type of ordering column in following call if it's not Integer
-        rec = _build_table_clause(element.select, 'rec', element.fk_type, ordering_colname)
+        is_ordering = ordering_colname and ordering_colname in element.select.columns
+        rec = _build_table_clause(element.select, 'rec', element.fk_type, ordering_colname if is_ordering else None)
         # documentation used for pgsql >= 8.4.0
         #
         # * http://www.postgresql.org/docs/8.4/static/queries-with.html
@@ -227,7 +228,7 @@ def visit_hierarchy(element, compiler, **kw):
         sel1.append_column(literal_column('ARRAY[%s]' %(element.child), 
                                           type_=ARRAY(element.fk_type)).\
                            label('connect_path'))
-        if ordering_colname:
+        if is_ordering:
             ordering_col = sel1.c.get(ordering_colname, None)
             if ordering_col is None:
                 ordering_col = element.table.c[ordering_colname]
@@ -252,7 +253,7 @@ def visit_hierarchy(element, compiler, **kw):
                       func.array_append(rec.c.connect_path, 
                                         getattr(element.table.c, element.child))
                                 ))
-        if ordering_colname:
+        if is_ordering:
             sel2.append_column(label('%s_path' % (ordering_colname),
                       func.array_append(rec.c['%s_path' % (ordering_colname,)],
                                         getattr(element.table.c, ordering_colname))
@@ -282,10 +283,10 @@ def visit_hierarchy(element, compiler, **kw):
                            "(order by connect_path) when true then false "\
                            "else true end").label('is_leaf')
         )
-        qry = "with recursive rec as (%s) %s order by %s_path" %\
+        qry = "with recursive rec as (%s)\n%s\norder by %s_path" %\
                 (compiler.process(sel3),
                  new_sel,
-                 ordering_colname if ordering_colname else 'connect'
+                 ordering_colname if is_ordering else 'connect'
                 )
         if kw.get('asfrom', False):
             qry = '(%s)' % qry
