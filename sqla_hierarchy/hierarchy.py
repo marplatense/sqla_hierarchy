@@ -2,8 +2,8 @@
 """Queries to generate hierarchical relations"""
 
 from sqlalchemy import Integer, and_, String, Boolean
-from sqlalchemy.sql import union_all, select
-from sqlalchemy.sql.expression import func, literal_column, label, literal, cast
+from sqlalchemy.sql import select
+from sqlalchemy.sql.expression import func, literal_column, label
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.postgresql.base import ARRAY
 from sqlalchemy.sql.expression import (
@@ -220,8 +220,8 @@ def visit_hierarchy(element, compiler, **kw):
            getattr(element, 'starting_node') is not False:
             sel1 = sel1.where(func.coalesce(
                 literal_column(element.parent, type_=String),
-                literal(val, type_=String))==\
-                literal(element.starting_node, type_=String))
+                literal_column(val, type_=String))==\
+                literal_column(element.starting_node, type_=String))
         # the same select submitted by the user plus a 1 as the first level and
         # an array with the current id
         sel1.append_column(literal_column('1', type_=Integer).label('level'))
