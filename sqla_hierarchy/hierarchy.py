@@ -3,7 +3,7 @@
 
 from sqlalchemy import Integer, and_, String, Boolean
 from sqlalchemy.sql import select
-from sqlalchemy.sql.expression import func, literal_column, label
+from sqlalchemy.sql.expression import func, literal_column, label, literal
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.postgresql.base import ARRAY
 from sqlalchemy.sql.expression import (
@@ -44,7 +44,8 @@ class HierarchyLesserError(HierarchyError):
                                        ".".join([str(x) for x in \
                                                  self.version]))
 
-def _build_table_clause(select, name, path_type, ordering_colname=None, ordering_coltype=Integer):
+def _build_table_clause(select, name, path_type, ordering_colname=None, 
+                        ordering_coltype=Integer):
     """For pgsql, it builds the recursive table needed to perform a
     hierarchical query.
     Parameters:
@@ -59,7 +60,8 @@ def _build_table_clause(select, name, path_type, ordering_colname=None, ordering
     cols.append(ColumnClause('level', type_=Integer))
     cols.append(ColumnClause('connect_path', type_=ARRAY(path_type)))
     if ordering_colname:
-        cols.append(ColumnClause('%s_path' % ordering_colname, type_=ARRAY(ordering_coltype)))
+        cols.append(ColumnClause('%s_path' % ordering_colname, 
+                                type_=ARRAY(ordering_coltype)))
     tb = TableClause(name, *cols)
     return tb
 
@@ -202,9 +204,12 @@ def visit_hierarchy(element, compiler, **kw):
         if not ordering_colname or ordering_colname not in element.table.c\
                 and ordering_colname not in element.select.c:
             ordering_colname = None
-        # FIXME: pass type of ordering column in following call if it's not Integer
-        is_ordering = ordering_colname and ordering_colname in element.select.columns
-        rec = _build_table_clause(element.select, 'rec', element.fk_type, ordering_colname if is_ordering else None)
+        # FIXME: pass type of ordering column in following call if it's not 
+        # Integer
+        is_ordering = ordering_colname and ordering_colname in \
+                element.select.columns
+        rec = _build_table_clause(element.select, 'rec', 
+                element.fk_type, ordering_colname if is_ordering else None)
         # documentation used for pgsql >= 8.4.0
         #
         # * http://www.postgresql.org/docs/8.4/static/queries-with.html
@@ -220,8 +225,8 @@ def visit_hierarchy(element, compiler, **kw):
            getattr(element, 'starting_node') is not False:
             sel1 = sel1.where(func.coalesce(
                 literal_column(element.parent, type_=String),
-                literal_column(val, type_=String))==\
-                literal_column(element.starting_node, type_=String))
+                literal(val, type_=String))==\
+                literal(element.starting_node, type_=String))
         # the same select submitted by the user plus a 1 as the first level and
         # an array with the current id
         sel1.append_column(literal_column('1', type_=Integer).label('level'))
@@ -256,7 +261,8 @@ def visit_hierarchy(element, compiler, **kw):
         if is_ordering:
             sel2.append_column(label('%s_path' % (ordering_colname),
                       func.array_append(rec.c['%s_path' % (ordering_colname,)],
-                                        getattr(element.table.c, ordering_colname))
+                                        getattr(element.table.c, 
+                                            ordering_colname))
                                 ))
         # check if any member of connect_path has already been visited and
         # return true in that case, preventing an infinite loop (see where
