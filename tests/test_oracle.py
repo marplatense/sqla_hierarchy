@@ -98,8 +98,11 @@ class TestHierarchy(object):
     def test1_fk_error(self):
         """Hierarchy oracle: When selecting a table with no fk->pk in the same 
         table, we should raise an error"""
-        assert_raises(MissingForeignKey, Hierarchy, DBSession,
-                      no_fk_tb, select([no_fk_tb]))
+        try:
+            Hierarchy(DBSession, no_fk_tb, select([no_fk_tb]))
+        except MissingForeignKeyError,  e:
+            eq_(e.args[0], "A proper foreign key couldn't be found in "
+                           "relation no_fk_tb")
 
     def test2_execute(self):
         """Hierarchy oracle: just to see if it works"""

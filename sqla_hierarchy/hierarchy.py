@@ -10,7 +10,7 @@ from sqlalchemy.sql.expression import (
     Select, TableClause, ColumnClause
 )
 __all__ = ['Hierarchy', 'supported_db', 'HierarchyLesserError',
-           'MissingForeignKey']
+           'MissingForeignKeyError']
 
 supported_db = {
     'postgresql': (8,4,0),
@@ -21,15 +21,13 @@ class HierarchyError(Exception):
     """Base error class for Hierarchy"""
     pass
 
-class MissingForeignKey(HierarchyError):
+class MissingForeignKeyError(HierarchyError):
     """If the selected table does not have a foreign key refering to itself,
     this error will be raised"""
     def __init__(self, relation):
         self.relation = relation
-
-    def __str__(self):
-        return "A proper foreign key couldn't be found in relation %s" %\
-                (self.relation)
+        self.args = ("A proper foreign key couldn't be found in relation "\
+                     "%s" % (self.relation), )
 
 class HierarchyLesserError(HierarchyError):
     """If the database version is lower than the version supported, this error
@@ -40,11 +38,11 @@ class HierarchyLesserError(HierarchyError):
 
     def __str__(self):
         return "This method hasn't been written for %s dialect/version "\
-               "lesser than %s yet" % (self.dialect, 
+               "lesser than %s yet" % (self.dialect,
                                        ".".join([str(x) for x in \
                                                  self.version]))
 
-def _build_table_clause(select, name, path_type, ordering_colname=None, 
+def _build_table_clause(select, name, path_type, ordering_colname=None,
                         ordering_coltype=Integer):
     """For pgsql, it builds the recursive table needed to perform a
     hierarchical query.
@@ -60,7 +58,7 @@ def _build_table_clause(select, name, path_type, ordering_colname=None,
     cols.append(ColumnClause('level', type_=Integer))
     cols.append(ColumnClause('connect_path', type_=ARRAY(path_type)))
     if ordering_colname:
-        cols.append(ColumnClause('%s_path' % ordering_colname, 
+        cols.append(ColumnClause('%s_path' % ordering_colname,
                                 type_=ARRAY(ordering_coltype)))
     tb = TableClause(name, *cols)
     return tb
@@ -69,7 +67,7 @@ class Hierarchy(Select):
     """Given a sqlalchemy.schema.Table and a sqlalchemy.sql.expression.Select,
     this class will return the information from these objects with some extra
     columns that will properly denote the hierarchical relation between the
-    rows. 
+    rows.
     The returned Hierarchy object could then be executed and it will return the
     same Select statement submitted plus the following columns:
         * level: the relative level of the row related to its parent
@@ -86,7 +84,7 @@ class Hierarchy(Select):
     hierarchy
     Special remarks:
         * The selected table must have a self referential foreign key relation,
-          otherwise it will raise MissingForeignKey
+          otherwise it will raise MissingForeignKeyError
         * Not every database is supported (at the moment). Check the global var
           supported_db for an up2date list. Trying to execute Hierarchy with an
           unsupported db will raise NotImplementedError or HierarchyLesserError
@@ -95,8 +93,8 @@ class Hierarchy(Select):
         * To prevent the query from returning every node as a different
           starting node and, therefore, having duplicate values, you can
           provide the 'starting_node' parameter in the **kwargs. The value you
-          must provide is the parent id for the root node you want to start 
-          building the hierarchical tree. 
+          must provide is the parent id for the root node you want to start
+          building the hierarchical tree.
           None has the same meaning as "0" since we perform a coalesce function 
           in the query. By default the system will add a 'starting_node'="0". If
           you don't want a starting node, pass 'starting_node'=False and the
@@ -118,7 +116,7 @@ class Hierarchy(Select):
                 self.child = ev.column.name
                 break
         if self.parent is None or self.child is None:
-            raise(MissingForeignKey(self.table.name))
+            raise(MissingForeignKeyError(self.table.name))
         self.starting_node = kw.pop('starting_node', None)
         self.ordering_colname = kw.pop('ordering_colname', 'ordering')
         # if starting node does not exist or it's null, we add starting_node=0
@@ -180,18 +178,25 @@ def visit_hierarchy(element, compiler, **kw):
             elif getattr(element, 'starting_node') is False:
                 pass
             else:
-                qry += " start with %s=%s" % (element.parent, 
+                qry += " start with %s=%s" % (element.parent,
                                              element.starting_node)
         qry += " connect by prior %s=%s" % (element.child, element.parent)
         if kw.get('asfrom', False):
             qry = '(%s)' % qry
         return qry
 
+@compiles(Hierarchy, 'mssql')
+def visit_hierarchy(element, compiler, **kw):
+    """visit compilation idiom for mssql"""
+    if compiler.dialect.server_version_info < supported_db['mssql']:
+        raise(HierarchyLesserError(compiler.dialect.name,
+                                   supported_db['mssql']))
+
 @compiles(Hierarchy, 'postgresql')
 def visit_hierarchy(element, compiler, **kw):
     """visit compilation idiom for pgsql"""
     if compiler.dialect.server_version_info < supported_db['postgresql']:
-        raise(HierarchyLesserError(compiler.dialect.name, 
+        raise(HierarchyLesserError(compiler.dialect.name,
                                    supported_db['postgresql']))
     else:
         if element.fk_type == String:
