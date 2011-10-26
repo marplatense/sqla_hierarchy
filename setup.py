@@ -7,7 +7,7 @@ readme.close()
 setup(
     name='sqla_hierarchy',
     packages=['sqla_hierarchy'],
-    version='0.1',
+    version='0.2',
     description='Adjacency List Relationships helper (only using databases own implementations)',
     long_description=README_TEXT,
     author='Mariano Mara',
@@ -24,5 +24,5 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     keywords = ['sqlachemy', 'hierarchy', 'adjacency list', 'python']
-    ,install_requires=['sqlalchemy<0.7']
+    ,install_requires=['sqlalchemy']
 )
