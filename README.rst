@@ -9,7 +9,7 @@ Description
 Given a `Table`_ object and a `Select`_ expression, this class will return the information from these objects with some extra columns that will properly denote the hierarchical relation between the rows. The returned Hierarchy object could then be executed and it will return the same Select statement submitted plus the following columns:
 
 - level: the relative level of the row related to its parent
-- connect_path: a list with all the ids that compound this part of the hierarchy, from the root node to the current value (**IMPORTANT**: Oracle requires some extra post processing to generate the list) 
+- connect_path: a list with all the ids that compound this part of the hierarchy, from the root node to the current value (**IMPORTANT**: Oracle requires some extra post processing to generate the list)
 - is_leaf: boolean indicating is the particular id is a leaf or not
 
 The resultset will be returned properly ordered by the levels in the hierarchy
@@ -48,55 +48,52 @@ First of all, let's set up some imports and variables we will be using ::
     >>> from sqla_hierarchy import *
     >>> DBSession = scoped_session(sessionmaker())
     >>> metadata = MetaData()
-    >>> config = ConfigParser.ConfigParser() 
-    >>> config.read('setup.cfg')
-    ['setup.cfg']
-    >>> engine = create_engine('postgresql://%s' % config.get('dburi', 'pg-db'))
+    >>> from README_dtest import engine
     >>> DBSession.configure(bind=engine)
     >>> metadata.bind = engine
 
 Let's build some simple table/class to hold boss/employee relation ::
 
-    >>> example_tb = Table('employee', metadata,  
-    ...                    Column('id', Unicode, primary_key=True), 
+    >>> example_tb = Table('employee', metadata,
+    ...                    Column('id', Unicode, primary_key=True),
     ...                    Column('boss', Unicode, ForeignKey('employee.id')))
-    >>> class Employee(object): 
-    ...     def __init__(self, employee, boss=None): 
+    >>> class Employee(object):
+    ...     def __init__(self, employee, boss=None):
     ...         self.id = employee
     ...         self.boss = boss
-    ...     def __repr__(self): 
-    ...         return "<Employee %s, Boss %s>" % (self.id, self.boss) 
-    ...  
+    ...     def __repr__(self):
+    ...         return "<Employee %s, Boss %s>" % (self.id, self.boss)
+    ...
     >>> mapper(Employee, example_tb, properties={  #doctest: +ELLIPSIS
-    ...        'parent': relationship(Employee, remote_side=[example_tb.c.id])}) 
+    ...        'parent': relationship(Employee, remote_side=[example_tb.c.id])})
     <Mapper at 0x...; Employee>
     >>> example_tb.drop(checkfirst=True)
     >>> example_tb.create(checkfirst=True)
 
 Add some data ::
 
-    >>> pl = [Employee(u'King Cold', None), Employee(u'Frieza', u'King Cold'), 
-    ...       Employee(u'Zarbon', u'Frieza'), Employee(u'Dodoria', u'Frieza'), 
-    ...       Employee(u'Captain Ginyu', u'Frieza'), 
+    >>> pl = [Employee(u'King Cold', None), Employee(u'Frieza', u'King Cold'),
+    ...       Employee(u'Zarbon', u'Frieza'), Employee(u'Dodoria', u'Frieza'),
+    ...       Employee(u'Captain Ginyu', u'Frieza'),
     ...       Employee(u'Jeice', u'Captain Ginyu'),
     ...       Employee(u'Burter', u'Captain Ginyu'),
     ...       Employee(u'Recoome', u'Captain Ginyu'),
     ...       Employee(u'Guldo', u'Captain Ginyu'),
-    ...       Employee(u'Dr Gero', None), Employee(u'A-16', u'Dr Gero'), 
-    ...       Employee(u'A-17', u'Dr Gero'), Employee(u'A-18', u'Dr Gero'), 
-    ...       Employee(u'Cell', u'Dr Gero'), Employee(u'Cell Junior', u'Cell')] 
+    ...       Employee(u'Dr Gero', None), Employee(u'A-16', u'Dr Gero'),
+    ...       Employee(u'A-17', u'Dr Gero'), Employee(u'A-18', u'Dr Gero'),
+    ...       Employee(u'Cell', u'Dr Gero'), Employee(u'Cell Junior', u'Cell')]
     >>> DBSession.add_all(pl)
     >>> DBSession.commit()
 
 Now let's query some basic relations. First we want a list of bosses and employees using some indentation to visually understand who depends on who ::
 
-    >>> qry = Hierarchy(DBSession, example_tb, select([example_tb])) 
+    >>> qry = Hierarchy(DBSession, example_tb, select([example_tb]))
     >>> rs = DBSession.execute(qry).fetchall()
     >>> for ev in rs:
     ...     if ev.level == 1:
     ...         print(ev.id)
     ...     else:
-    ...         print(" "*2*ev.level+ev.id) 
+    ...         print(" "*2*ev.level+ev.id)
     Dr Gero
         A-16
         A-17
@@ -132,7 +129,7 @@ Let's take a look at the special attributes sqla_hierachy added ::
 
     >>> print(rs[0].is_leaf)
     False
-    
+
 Now an example with a record that is a leaf ::
 
     >>> print(rs[9].level, rs[9].is_leaf)
