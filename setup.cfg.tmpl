@@ -3,8 +3,19 @@ with-coverage = True
 cover-package = sqla_hierarchy
 with-doctest = True
 doctest-extension = rst
+doctest-fixtures = _dtest
+
 
 [dburi]
-# rename this file to setup.cfg and add here all databases strings
-pg-db = user:pass@localhost/db
-oracle-db = user:pass@localhost/db
+# instructions:
+# 1. copy this file to setup.cfg
+# 2. fill in URL strings as needed.
+# 3. Comment out those configurations that aren't supported
+# on the target platform - tests which rely upon them will
+# be skipped.
+
+# postgresql
+pg-db = postgresql://user:pass@localhost/db
+
+# oracle
+#oracle-db = oracle://user:pass@localhost/db

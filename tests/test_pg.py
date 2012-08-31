@@ -1,21 +1,19 @@
 # -*- coding: UTF-8 -*-
 """"Testing hierarchy dialect in sqlalchemy"""
-import ConfigParser
-from exceptions import NotImplementedError
 from nose.tools import *
 from mock import Mock
 
-from sqlalchemy import Table, Column, ForeignKey, MetaData, create_engine
+from sqlalchemy import Table, Column, ForeignKey, MetaData
 from sqlalchemy import Integer, Unicode, Boolean
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.orm import mapper, relationship, scoped_session, sessionmaker
 from sqla_hierarchy import *
 
+from tests import get_engine
+
 DBSession = scoped_session(sessionmaker())
 metadata = MetaData()
-config = ConfigParser.ConfigParser() 
-config.read('setup.cfg')
-engine = create_engine('postgresql://%s' % config.get('dburi', 'pg-db'))
+engine = get_engine('pg-db')
 DBSession.configure(bind=engine)
 metadata.bind = engine
 
@@ -38,7 +36,7 @@ class Dummy(object):
 mapper(Dummy, dummy_tb, properties = {
        'parent': relationship(Dummy, remote_side=[dummy_tb.c.id])})
 
-no_fk_tb = Table('no_fk_tb', metadata, 
+no_fk_tb = Table('no_fk_tb', metadata,
                  Column('id', Integer, primary_key=True),
                  Column('name', Unicode(10), nullable=False),
                  Column('descrip', Unicode(100))
@@ -73,7 +71,7 @@ def setup():
               6
                 8
                   10
-                  12 
+                  12
           3
             5
             7
@@ -97,7 +95,7 @@ def setup():
 class TestHierarchy(object):
 
     def test1_fk_error(self):
-        """Hierarchy pgsql: When selecting a table with no fk->pk in the same 
+        """Hierarchy pgsql: When selecting a table with no fk->pk in the same
         table, we should raise an error"""
         try:
             Hierarchy(DBSession, no_fk_tb, select([no_fk_tb]))
@@ -114,13 +112,13 @@ class TestHierarchy(object):
 
     def test3_level_attr(self):
         """Hierarchy pgsql: fetching the extra 'level' column"""
-        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
-        ok_(hasattr(rs[0], 'level') == True, 
+        ok_(hasattr(rs[0], 'level') == True,
             "Fetched row has not got the 'level' extra column")
         # let's check if the level is right
         for ev in rs:
-            ok_(ev.level==dummy_values[ev.id][0], 
+            ok_(ev.level==dummy_values[ev.id][0],
                 "Wrong level for 'item %d'. Expected %d, got %d" %\
                            (ev.id, dummy_values[ev.id][0], ev.level))
 
@@ -129,25 +127,25 @@ class TestHierarchy(object):
         it"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
-        ok_(hasattr(rs[0], 'is_leaf') == True, 
+        ok_(hasattr(rs[0], 'is_leaf') == True,
             "Fetched row has not got the 'is_leaf' extra column")
         # according to our tree, only 5, 7, 10, 11, 12 are leaves
         for every in rs:
             if every.id in (5,7,10,11,12):
-                ok_(every.is_leaf == True, 
+                ok_(every.is_leaf == True,
                     'is_leaf failed. Expected True for %d' \
                                %(every.id))
             else:
-                ok_(every.is_leaf == False, 
+                ok_(every.is_leaf == False,
                     'is_leaf failed. Expected False for %d' \
                                %(every.id))
 
     def test5_connect_path(self):
-        """Hierarchy pgsql: if present 'connect_path' in kw, we should return 
+        """Hierarchy pgsql: if present 'connect_path' in kw, we should return
         the path using the sep character defined by the user"""
-        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
-        ok_(hasattr(rs[0], 'connect_path') == True, 
+        ok_(hasattr(rs[0], 'connect_path') == True,
             "Fetched row has not got the 'connect_path' extra column")
         # let's check the paths
         for ev in rs:
@@ -170,31 +168,31 @@ class TestHierarchy(object):
             elif ev.id == 9:
                 ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10],
                     'Failed path with id 10')
             elif ev.id == 11:
                 ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12],
                     'Failed path with id 12')
 
     def test6_all_together(self):
         """Hierarchy pgsql: all together now"""
-        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb])) 
+        qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb]))
         rs = DBSession.execute(qry).fetchall()
-        ok_(hasattr(rs[0], 'connect_path') == True, 
+        ok_(hasattr(rs[0], 'connect_path') == True,
             "Fetched row has not got the 'connect_path' extra column")
-        ok_(hasattr(rs[0], 'level') == True, 
+        ok_(hasattr(rs[0], 'level') == True,
             "Fetched row has not got the 'level' extra column")
         for ev in rs:
-            ok_(ev.level==dummy_values[ev.id][0], 
+            ok_(ev.level==dummy_values[ev.id][0],
                 "Wrong level for 'item %d'. Expected %d, got %d" %\
                 (ev.id, dummy_values[ev.id][0], ev.level))
             if ev.id in (5,7,10,11,12):
                 ok_(ev.is_leaf == True, 'is_leaf failed. Expected True for %d' \
                     %(ev.id))
             else:
-                ok_(ev.is_leaf == False, 
+                ok_(ev.is_leaf == False,
                     'is_leaf failed. Expected False for %d' \
                     %(ev.id))
             if ev.id == 1:
@@ -216,18 +214,18 @@ class TestHierarchy(object):
             elif ev.id == 9:
                 ok_(ev.connect_path==[1, 3, 9], 'Failed path with id 9')
             elif ev.id == 10:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10], 
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 10],
                     'Failed path with id 10')
             elif ev.id == 11:
                 ok_(ev.connect_path==[1, 3, 9, 11], 'Failed path with id 11')
             elif ev.id == 12:
-                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12], 
+                ok_(ev.connect_path==[1, 2, 4, 6, 8, 12],
                     'Failed path with id 12')
 
     def test7_where_clause(self):
         """Hierarchy pgsql: we pass a starting node"""
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb.c.id]),
-                        **{'starting_node':3}) 
+                        **{'starting_node':3})
         rs = DBSession.execute(qry).fetchall()
         expected = [5,7,9,11]
         real = [v[0] for v in rs]
@@ -235,7 +233,7 @@ class TestHierarchy(object):
         eq_(expected, real)
 
     def test8_where_clause(self):
-        """Hierarchy pgsql: we pass a where clause, we expect it to be 
+        """Hierarchy pgsql: we pass a where clause, we expect it to be
         replicated in every subquery"""
         v1 = DBSession.query(Dummy).get(9)
         v2 = DBSession.query(Dummy).get(11)
@@ -243,7 +241,7 @@ class TestHierarchy(object):
         v2.active = False
         DBSession.flush()
         qry = Hierarchy(DBSession, dummy_tb, select([dummy_tb.c.id],
-                                             dummy_tb.c.active==True)) 
+                                             dummy_tb.c.active==True))
         rs = DBSession.execute(qry).fetchall()
         expected = [1,2,3,4,5,6,7,8,10,12]
         real = [v[0] for v in rs]
